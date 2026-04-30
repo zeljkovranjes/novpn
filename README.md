@@ -225,3 +225,31 @@ as `INTEGER`) and `ip_ranges_v6(start_ip, end_ip)` (IPv6 as 16-byte `BLOB`, orde
 by SQLite's binary `memcmp` which matches numeric IPv6 ordering). Single lookups
 against ~10k–500k ranges return in ~1 ms on a laptop.
 
+## Layout
+
+```
+novpn/
+├── src/
+│   ├── index.ts              # entrypoint, mounts routes, boots scheduler
+│   ├── lib/
+│   │   ├── env.ts            # env parsing
+│   │   ├── auth.ts           # Bearer + timing-safe compare
+│   │   └── ip.ts             # IPv4 parsing (single, CIDR, range)
+│   ├── db/
+│   │   ├── db.ts             # Kysely + better-sqlite3
+│   │   ├── schema.ts         # types
+│   │   ├── migrate.ts        # CLI + Migrator
+│   │   ├── seed.ts           # default providers
+│   │   └── migrations/
+│   ├── services/
+│   │   ├── fetcher.ts        # source fetch + parse + conditional GET
+│   │   ├── providers.ts      # CRUD + refresh + range merge
+│   │   ├── check.ts          # IP lookup
+│   │   └── scheduler.ts      # node-cron wrapper
+│   ├── routes/               # Hono route modules
+│   └── cli/refresh.ts        # `pnpm refresh [id]`
+├── worker/                   # reserved for future CF Worker variant
+├── data/                     # SQLite DB (gitignored)
+└── ...
+```
+
