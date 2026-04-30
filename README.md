@@ -179,3 +179,28 @@ For repos that ship multiple files (e.g. ProtonVPN ships `_logicals.json`, `_ips
 > lists upstream. IPv6 lookup is fully wired and ready — add a custom provider
 > with v6 sources via `POST /v1/providers` and the rest is automatic.
 
+### Meta
+
+```
+GET /v1/categories     # categories in use, derived from providers
+GET /v1/stats          # total ranges + per-provider state
+GET /health            # always public, no auth
+GET /                  # service info, includes auth_required hint
+```
+
+## Default providers
+
+Seeded once on first migration. Edit or disable via the API; nothing here is special-cased.
+
+| ID | Category | Source |
+|---|---|---|
+| `protonvpn` | vpn | tn3w/ProtonVPN-IPs (`protonvpn_ips.txt`, `protonvpn_entry_ips.txt`) |
+| `tunnelbear` | vpn | tn3w/TunnelBear-IPs (`tunnelbear_ips.txt`) |
+| `nordvpn` | vpn | ipapi.is `nordvpn-ip-addresses.txt` |
+| `ipvanish` | vpn | ipapi.is `ipvanish-ip-addresses.txt` |
+| `x4bnet` | vpn | X4BNet/lists_vpn (`output/vpn/ipv4.txt`) — aggregates many providers |
+| `abuseipdb` | abuse | borestad/blocklist-abuseipdb (`abuseipdb-s100-30d.ipv4`) — high-confidence, last 30 days |
+
+Pomerium/vpnlist is not included by default — its YAML format is unsupported in v1
+and X4BNet covers similar ground.
+
