@@ -79,3 +79,17 @@ VALUES (
   '[{"url":"https://api.ivpn.net/v5/servers.json","format":"ivpn-servers"}]',
   unixepoch(), unixepoch()
 );
+
+INSERT OR IGNORE INTO providers (id, name, category, enabled, sources, created_at, updated_at)
+VALUES (
+  'avastel', 'Avastel proxy-bot blocklist', 'proxy', 1,
+  '[{"url":"https://raw.githubusercontent.com/antoinevastel/avastel-bot-ips-lists/master/avastel-proxy-bot-ips-blocklist-5days.txt","format":"avastel-csv"}]',
+  unixepoch(), unixepoch()
+);
+
+INSERT OR IGNORE INTO providers (id, name, category, enabled, sources, created_at, updated_at)
+VALUES (
+  'mmpx12-proxies', 'mmpx12 proxy IPs', 'proxy', 1,
+  '[{"url":"https://raw.githubusercontent.com/mmpx12/proxy-list/master/ips-list.txt","format":"txt"}]',
+  unixepoch(), unixepoch()
+);

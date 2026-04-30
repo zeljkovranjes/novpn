@@ -110,6 +110,9 @@ export async function fetchSource(source: SourceConfig): Promise<FetchOutcome> {
       case 'tor-csv':
         ranges = parseTorCsv(body);
         break;
+      case 'avastel-csv':
+        ranges = parseAvastelCsv(body);
+        break;
       default:
         ranges = parseTxt(body);
     }
@@ -233,6 +236,21 @@ function parseAirvpnStatus(body: string): ParsedRange[] {
       const r = parseLine(v);
       if (r) out.push(r);
     }
+  }
+  return out;
+}
+
+// avastel proxy-bot blocklist: `;`-separated CSV with `#` comment lines and
+// a header `ip_address;autonomous_system;confidence`. We keep column 1 only.
+function parseAvastelCsv(body: string): ParsedRange[] {
+  const out: ParsedRange[] = [];
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (/^ip_address\b/i.test(line)) continue; // skip header
+    const ip = line.split(';')[0]!.trim();
+    const r = parseLine(ip);
+    if (r) out.push(r);
   }
   return out;
 }

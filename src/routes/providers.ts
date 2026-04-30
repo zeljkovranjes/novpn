@@ -26,6 +26,7 @@ const SourceSchema = z.object({
     'airvpn-status',
     'ivpn-servers',
     'tor-csv',
+    'avastel-csv',
   ]),
 });
 

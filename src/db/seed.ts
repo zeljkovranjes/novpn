@@ -114,6 +114,30 @@ const DEFAULT_PROVIDERS: Seed[] = [
       { url: 'https://api.ivpn.net/v5/servers.json', format: 'ivpn-servers' },
     ],
   },
+  {
+    id: 'avastel',
+    name: 'Avastel proxy-bot blocklist',
+    category: 'proxy',
+    sources: [
+      // 5-day curated blocklist (~300 high-confidence CIDRs), `;`-separated
+      // CSV with comments. Smaller than the 1-day raw list (18MB), tighter
+      // confidence bound — better signal-to-noise for blocking.
+      {
+        url: 'https://raw.githubusercontent.com/antoinevastel/avastel-bot-ips-lists/master/avastel-proxy-bot-ips-blocklist-5days.txt',
+        format: 'avastel-csv',
+      },
+    ],
+  },
+  {
+    id: 'mmpx12-proxies',
+    name: 'mmpx12 proxy IPs',
+    category: 'proxy',
+    sources: [
+      // Plain newline-delimited list of proxy server IPs (~3300 entries),
+      // updated daily.
+      { url: 'https://raw.githubusercontent.com/mmpx12/proxy-list/master/ips-list.txt', format: 'txt' },
+    ],
+  },
 ];
 
 export async function seedIfEmpty(): Promise<{ inserted: string[] }> {

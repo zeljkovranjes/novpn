@@ -7,7 +7,8 @@ export type SourceFormat =
   | 'mullvad-relays'
   | 'airvpn-status'
   | 'ivpn-servers'
-  | 'tor-csv';
+  | 'tor-csv'
+  | 'avastel-csv';
 
 export type SourceConfig = {
   url: string;
