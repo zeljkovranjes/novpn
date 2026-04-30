@@ -265,3 +265,31 @@ pnpm migrate:down # one step down
 pnpm refresh [id] # refresh all providers, or just one
 ```
 
+## Security model
+
+- **Source URL fetcher is locked down.** Only `http://` and `https://` are accepted; URLs
+  with userinfo are rejected; the hostname is resolved and any address landing in
+  RFC1918, loopback, link-local, CGNAT, multicast, IPv6 ULA / link-local / multicast,
+  the documentation prefix `2001:db8::/32`, the well-known NAT64 prefix, or
+  `::ffff:` IPv4-mapped private space is rejected. Redirects are followed *manually*
+  with the same guard re-applied at every hop (max 5 hops). Response body is capped
+  at 50 MB and rejected early when `Content-Length` advertises more.
+- **Auth secret comparison is constant-time on a fixed-length digest** (`SHA-256` of
+  both sides through `crypto.timingSafeEqual`), so neither value nor length is leaked
+  via timing.
+- **Concurrent refresh of the same provider is a 409.** Background refreshes triggered
+  by `POST /v1/providers` and `PATCH …/sources` swallow that 409 silently.
+- **Source error messages are sanitized** (control chars stripped, truncated to 200
+  chars) before they hit the providers JSON, so a hostile upstream can't smuggle
+  ANSI escape sequences into logs or `last_error`.
+- **Trusted proxy:** `/v1/check/me` walks a list of CDN/proxy headers in
+  most-authoritative-first order — `cf-connecting-ip`, `cf-connecting-ipv6`,
+  `cf-pseudo-ipv4`, `true-client-ip` (Cloudflare Enterprise / Akamai),
+  `fastly-client-ip`, `fly-client-ip`, `x-vercel-forwarded-for`,
+  `x-azure-clientip`, `x-azure-socketip`, `x-appengine-user-ip`, `x-real-ip`,
+  `x-client-ip`, `x-cluster-client-ip`, RFC 7239 `Forwarded`, then `x-forwarded-for`
+  — and trims any `:port` or `[v6]` wrapper. **Only run novpn behind a reverse
+  proxy/CDN that strips/overwrites those headers** — otherwise any client can forge
+  them. When exposed directly to the internet, treat `/check?ip=…` as the canonical
+  lookup and ignore `/check/me`.
+
