@@ -1,5 +1,7 @@
+import type { Kysely, Transaction } from 'kysely';
 import { getDb, now } from '../db/db.js';
 import type {
+  Database as DB,
   ProviderRow,
   RefreshStatus,
   SourceConfig,
@@ -12,7 +14,10 @@ import {
   type ParsedRangeV4,
   type ParsedRangeV6,
 } from '../lib/ip.js';
+import { isWorkers } from '../lib/runtime.js';
 import { fetchSource, sanitizeErr } from './fetcher.js';
+
+type Executor = Kysely<DB> | Transaction<DB>;
 
 export type PublicProvider = Omit<ProviderRow, 'sources' | 'enabled'> & {
   enabled: boolean;
@@ -267,9 +272,10 @@ async function refreshProviderInner(id: string): Promise<RefreshResult> {
   if (anyOk) {
     const mergedV4 = mergeV4(v4Ranges);
     const mergedV6 = mergeV6(v6Ranges);
-    await db.transaction().execute(async (trx) => {
-      await trx.deleteFrom('ip_ranges').where('provider_id', '=', id).execute();
-      await trx.deleteFrom('ip_ranges_v6').where('provider_id', '=', id).execute();
+
+    const writeRefresh = async (exec: Executor): Promise<void> => {
+      await exec.deleteFrom('ip_ranges').where('provider_id', '=', id).execute();
+      await exec.deleteFrom('ip_ranges_v6').where('provider_id', '=', id).execute();
       const CHUNK = 500;
       for (let i = 0; i < mergedV4.length; i += CHUNK) {
         const slice = mergedV4.slice(i, i + CHUNK).map((r) => ({
@@ -278,7 +284,7 @@ async function refreshProviderInner(id: string): Promise<RefreshResult> {
           end_ip: r.end,
           cidr: r.cidr,
         }));
-        await trx.insertInto('ip_ranges').values(slice).execute();
+        await exec.insertInto('ip_ranges').values(slice).execute();
       }
       for (let i = 0; i < mergedV6.length; i += CHUNK) {
         const slice = mergedV6.slice(i, i + CHUNK).map((r) => ({
@@ -287,9 +293,9 @@ async function refreshProviderInner(id: string): Promise<RefreshResult> {
           end_ip: r.end,
           cidr: r.cidr,
         }));
-        await trx.insertInto('ip_ranges_v6').values(slice).execute();
+        await exec.insertInto('ip_ranges_v6').values(slice).execute();
       }
-      await trx
+      await exec
         .updateTable('providers')
         .set({
           sources: JSON.stringify(updatedSources),
@@ -299,7 +305,18 @@ async function refreshProviderInner(id: string): Promise<RefreshResult> {
         })
         .where('id', '=', id)
         .execute();
-    });
+    };
+
+    if (isWorkers()) {
+      // kysely-d1 throws "Transactions are not supported yet." — D1 only
+      // exposes atomic writes via its batch() API, which Kysely doesn't map
+      // to db.transaction(). Sequential writes have a brief window of
+      // partial visibility per provider during refresh; acceptable for a
+      // daily-refresh, read-mostly workload.
+      await writeRefresh(db);
+    } else {
+      await db.transaction().execute(writeRefresh);
+    }
     totalRanges = mergedV4.length + mergedV6.length;
   } else {
     await db
