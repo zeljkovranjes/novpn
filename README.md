@@ -83,15 +83,17 @@ Response:
   "version": 4,
   "vpn": true,
   "abuse": false,
-  "flags": { "vpn": true, "abuse": false },
+  "tor": false,
+  "flags": { "vpn": true, "abuse": false, "tor": false },
   "providers": [
     { "provider_id": "nordvpn", "category": "vpn", "match": "1.2.3.0/24" }
   ]
 }
 ```
 
-`vpn` and `abuse` are always evaluated and returned as top-level booleans —
-an IP can be a VPN exit without being abusive, and vice versa.
+`vpn`, `abuse`, and `tor` are always evaluated and returned as top-level
+booleans — they answer different questions and an IP can be one without
+being the others.
 
 Endpoints:
 
