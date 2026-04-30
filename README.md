@@ -161,3 +161,21 @@ last error) so you can debug a flaky URL.
 Provider IDs are `[a-z0-9][a-z0-9_-]{0,63}` (case-insensitive). `category` is a
 free-form string; `vpn` is the only category that's checked by default.
 
+### Source formats
+
+| Format | Looks like | Use for |
+|---|---|---|
+| `txt` | newline-delimited; `#` comments and blank lines OK; supports single IP, CIDR, and `start-end` ranges (v4 only) | almost every public list |
+| `json-array` | `["1.2.3.0/24", "2001:db8::/32"]` | sources that ship a JSON array of strings |
+
+Each line/entry can be IPv4 or IPv6 — single host, CIDR, or `start-end` (v4 only).
+A single source can mix versions; novpn splits them into separate tables transparently.
+
+For repos that ship multiple files (e.g. ProtonVPN ships `_logicals.json`, `_ips.json`,
+`_ips.txt`, …), point at the simple `*_ips.txt` flavor. Complex API-dump files like
+`protonvpn_logicals.json` are out of scope.
+
+> **About the default seed:** the six default providers happen to ship IPv4-only
+> lists upstream. IPv6 lookup is fully wired and ready — add a custom provider
+> with v6 sources via `POST /v1/providers` and the rest is automatic.
+
