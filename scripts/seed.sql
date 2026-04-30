@@ -44,3 +44,17 @@ VALUES (
   '[{"url":"https://raw.githubusercontent.com/borestad/blocklist-abuseipdb/main/abuseipdb-s100-30d.ipv4","format":"txt"}]',
   unixepoch(), unixepoch()
 );
+
+INSERT OR IGNORE INTO providers (id, name, category, enabled, sources, created_at, updated_at)
+VALUES (
+  'mullvad', 'Mullvad', 'vpn', 1,
+  '[{"url":"https://api.mullvad.net/app/v1/relays","format":"mullvad-relays"}]',
+  unixepoch(), unixepoch()
+);
+
+INSERT OR IGNORE INTO providers (id, name, category, enabled, sources, created_at, updated_at)
+VALUES (
+  'tor', 'Tor exit nodes', 'tor', 1,
+  '[{"url":"https://www.dan.me.uk/torlist/?exit","format":"txt"}]',
+  unixepoch(), unixepoch()
+);

@@ -12,9 +12,10 @@ const MAX_BODY_BYTES = 50 * 1024 * 1024; // 50 MB
 const MAX_REDIRECTS = 5;
 
 export async function fetchSource(source: SourceConfig): Promise<FetchOutcome> {
+  const isJsonFormat = source.format === 'json-array' || source.format === 'mullvad-relays';
   const headers: Record<string, string> = {
     'User-Agent': 'novpn/0.1 (+https://github.com/zeljkovranjes/novpn)',
-    Accept: source.format === 'json-array' ? 'application/json' : 'text/plain, */*;q=0.1',
+    Accept: isJsonFormat ? 'application/json' : 'text/plain, */*;q=0.1',
   };
   if (source.etag) headers['If-None-Match'] = source.etag;
   if (source.last_modified) headers['If-Modified-Since'] = source.last_modified;
@@ -89,7 +90,9 @@ export async function fetchSource(source: SourceConfig): Promise<FetchOutcome> {
 
   let ranges: ParsedRange[];
   try {
-    ranges = source.format === 'json-array' ? parseJsonArray(body) : parseTxt(body);
+    if (source.format === 'json-array') ranges = parseJsonArray(body);
+    else if (source.format === 'mullvad-relays') ranges = parseMullvadRelays(body);
+    else ranges = parseTxt(body);
   } catch (err) {
     return { status: 'failed', error: sanitizeErr(err) };
   }
@@ -160,6 +163,33 @@ function parseJsonArray(body: string): ParsedRange[] {
     if (typeof item !== 'string') continue;
     const r = parseLine(item);
     if (r) out.push(r);
+  }
+  return out;
+}
+
+// Mullvad's https://api.mullvad.net/app/v1/relays returns:
+//   { wireguard: { relays: [{ ipv4_addr_in, ipv6_addr_in, ... }, ...] },
+//     bridge:    { relays: [{ ipv4_addr_in, ... }, ...] },
+//     ... }
+// We extract every host IP we can find; merging happens later.
+function parseMullvadRelays(body: string): ParsedRange[] {
+  const data = JSON.parse(body) as {
+    wireguard?: { relays?: Array<{ ipv4_addr_in?: string; ipv6_addr_in?: string }> };
+    bridge?: { relays?: Array<{ ipv4_addr_in?: string; ipv6_addr_in?: string }> };
+  };
+  const out: ParsedRange[] = [];
+  const push = (host: string | undefined) => {
+    if (!host) return;
+    const r = parseLine(host);
+    if (r) out.push(r);
+  };
+  for (const r of data.wireguard?.relays ?? []) {
+    push(r.ipv4_addr_in);
+    push(r.ipv6_addr_in);
+  }
+  for (const r of data.bridge?.relays ?? []) {
+    push(r.ipv4_addr_in);
+    push(r.ipv6_addr_in);
   }
   return out;
 }

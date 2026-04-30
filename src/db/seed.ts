@@ -61,6 +61,26 @@ const DEFAULT_PROVIDERS: Seed[] = [
       },
     ],
   },
+  {
+    id: 'mullvad',
+    name: 'Mullvad',
+    category: 'vpn',
+    sources: [
+      // Returns nested JSON with wireguard.relays[*].ipv4_addr_in / ipv6_addr_in.
+      // Custom parser pulls both v4 and v6 host addresses.
+      { url: 'https://api.mullvad.net/app/v1/relays', format: 'mullvad-relays' },
+    ],
+  },
+  {
+    id: 'tor',
+    name: 'Tor exit nodes',
+    category: 'tor',
+    sources: [
+      // dan.me.uk publishes a flat newline-delimited exit list. Rate-limited
+      // to once per 30 minutes per source IP — fine for daily cron.
+      { url: 'https://www.dan.me.uk/torlist/?exit', format: 'txt' },
+    ],
+  },
 ];
 
 export async function seedIfEmpty(): Promise<{ inserted: string[] }> {
