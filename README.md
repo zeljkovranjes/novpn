@@ -218,3 +218,10 @@ and X4BNet covers similar ground.
   before write — typical input shrinks ~10–15%.
 - **Manual:** `pnpm refresh` (all) or `pnpm refresh <provider-id>` (one) for ops use.
 
+## Lookup performance
+
+Point-in-CIDR queries use covering indexes on `ip_ranges(start_ip, end_ip)` (IPv4
+as `INTEGER`) and `ip_ranges_v6(start_ip, end_ip)` (IPv6 as 16-byte `BLOB`, ordered
+by SQLite's binary `memcmp` which matches numeric IPv6 ordering). Single lookups
+against ~10k–500k ranges return in ~1 ms on a laptop.
+
