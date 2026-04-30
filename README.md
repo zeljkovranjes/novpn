@@ -87,3 +87,77 @@ If the env var is unset, those endpoints return `503 admin_disabled` — the ope
 can still manage providers via `pnpm refresh` from the host. Lookup endpoints are
 public until you set a secret, then they require `Authorization: Bearer <secret>`.
 
+## API
+
+### Lookup
+
+Both IPv4 and IPv6 are accepted (any canonical form: `2001:db8::1`, `::1`, IPv4-mapped, etc.).
+
+```
+GET  /v1/check?ip=1.2.3.4
+GET  /v1/check?ip=2001:db8::1
+GET  /v1/check?ip=1.2.3.4&abuse=true&tor=true
+GET  /v1/check/me                          # uses cf-connecting-ip / x-forwarded-for (see "Trusted proxy" below)
+POST /v1/check/batch
+     { "ips": ["1.2.3.4", "2001:db8::1"], "abuse": true }
+```
+
+Response:
+
+```json
+{
+  "ip": "103.107.197.78",
+  "version": 4,
+  "vpn": true,
+  "flags": { "vpn": true, "abuse": false },
+  "providers": [
+    { "provider_id": "nordvpn", "category": "vpn", "match": "103.107.197.76/32" }
+  ]
+}
+```
+
+`vpn` is always present and always checked. Every other category (abuse, tor, …)
+is **opt-in** via a matching boolean flag (`?abuse=true` in query, or `"abuse": true`
+in the JSON body). The set of valid flags is whatever non-`vpn` categories
+currently exist in the providers table — adding a provider with `category: "tor"`
+makes `?tor=true` work immediately, no code change.
+
+`?all=true` enables every well-known category at once (`abuse`, `tor`, `proxy`,
+`datacenter`, `hosting`).
+
+### Providers (admin)
+
+```
+GET    /v1/providers
+GET    /v1/providers/:id
+POST   /v1/providers
+PATCH  /v1/providers/:id
+DELETE /v1/providers/:id
+POST   /v1/providers/:id/refresh
+POST   /v1/refresh
+```
+
+Create a custom provider:
+
+```bash
+curl -X POST http://localhost:3000/v1/providers \
+  -H 'authorization: Bearer $API_SECRET' \
+  -H 'content-type: application/json' \
+  -d '{
+        "id": "myvpn",
+        "name": "My VPN",
+        "category": "vpn",
+        "sources": [
+          { "url": "https://example.com/ips.txt",   "format": "txt" },
+          { "url": "https://example.com/ips.json",  "format": "json-array" }
+        ]
+      }'
+```
+
+The server kicks off a background refresh immediately on create or on a sources-change
+patch. `GET /v1/providers/:id` returns per-source state (last status, last count, etag,
+last error) so you can debug a flaky URL.
+
+Provider IDs are `[a-z0-9][a-z0-9_-]{0,63}` (case-insensitive). `category` is a
+free-form string; `vpn` is the only category that's checked by default.
+
