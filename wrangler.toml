@@ -1,0 +1,20 @@
+name = "novpn"
+main = "src/worker.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 binding. Run `wrangler d1 create novpn` once to provision and paste the
+# returned database_id below. Local dev (`wrangler dev`) uses an emulated D1.
+[[d1_databases]]
+binding = "DB"
+database_name = "novpn"
+database_id = "REPLACE_WITH_ID_FROM_WRANGLER_D1_CREATE"
+migrations_dir = "migrations"
+
+# Daily refresh at 03:00 UTC. Configurable in the Cloudflare dashboard or here.
+[triggers]
+crons = ["0 3 * * *"]
+
+# Set API_SECRET as a Workers secret (NOT here):
+#   wrangler secret put API_SECRET
+# Without it, admin endpoints return 503 admin_disabled.
