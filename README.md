@@ -84,7 +84,7 @@ Response:
   "vpn": true,
   "abuse": false,
   "tor": false,
-  "flags": { "vpn": true, "abuse": false, "tor": false },
+  "flags": ["vpn"],
   "providers": [
     { "provider_id": "nordvpn", "category": "vpn", "match": "1.2.3.0/24" }
   ]
@@ -93,7 +93,8 @@ Response:
 
 `vpn`, `abuse`, and `tor` are always evaluated and returned as top-level
 booleans — they answer different questions and an IP can be one without
-being the others.
+being the others. `flags` lists the categories that actually matched
+(empty array if none).
 
 Endpoints:
 

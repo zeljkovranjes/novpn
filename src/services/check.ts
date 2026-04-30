@@ -20,7 +20,7 @@ export type CheckResult = {
   vpn: boolean;
   abuse: boolean;
   tor: boolean;
-  flags: Record<string, boolean>;
+  flags: string[];
   providers: ProviderHit[];
 };
 
@@ -90,13 +90,27 @@ export async function checkIp(ipStr: string, extraCategories: string[]): Promise
     }
   }
 
+  // flags is the list of categories that *matched*, in stable order:
+  // always-on first (vpn, abuse, tor), then any opt-in extras the caller asked
+  // about. Empty array means no category hit. The booleans above expose the
+  // always-on results directly; the array is what callers should iterate when
+  // they care about every category that fired (including custom ones).
+  const matchedFlags: string[] = [];
+  for (const c of ALWAYS_ON_CATEGORIES) {
+    if (flags[c]) matchedFlags.push(c);
+  }
+  for (const c of extraCategories.map((x) => x.toLowerCase())) {
+    if ((ALWAYS_ON_CATEGORIES as readonly string[]).includes(c)) continue;
+    if (flags[c]) matchedFlags.push(c);
+  }
+
   return {
     ip: ipStr,
     version,
     vpn: flags.vpn === true,
     abuse: flags.abuse === true,
     tor: flags.tor === true,
-    flags,
+    flags: matchedFlags,
     providers: hits,
   };
 }
