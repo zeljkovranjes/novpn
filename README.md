@@ -293,3 +293,9 @@ pnpm refresh [id] # refresh all providers, or just one
   them. When exposed directly to the internet, treat `/check?ip=…` as the canonical
   lookup and ignore `/check/me`.
 
+## Limits
+
+- No range merging *across* providers (deliberate — keeps per-provider attribution).
+- The HTTP scheduler runs in-process; if you scale to multiple replicas, set
+  `DISABLE_CRON=1` on all but one (or run refresh out-of-band via `pnpm refresh`).
+- The `start-end` shorthand is IPv4 only; IPv6 should be expressed as host or CIDR.
