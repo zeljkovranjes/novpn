@@ -32,3 +32,30 @@ On first boot, the Node entry:
 4. Schedules a daily refresh at 03:00 (configurable via `REFRESH_CRON`).
 
 Refreshing all six default sources takes ~5 seconds on a warm network.
+
+
+## Cloudflare Workers quickstart
+
+```bash
+pnpm install
+pnpm wrangler:d1:create                            # one time — creates the D1 db, prints database_id
+# paste the database_id into wrangler.toml
+
+pnpm exec wrangler d1 migrations apply novpn       # local dev D1
+pnpm exec wrangler d1 execute novpn --file=./scripts/seed.sql
+
+pnpm wrangler:dev                                  # local dev on :8787
+```
+
+Deploying to production:
+
+```bash
+pnpm exec wrangler d1 migrations apply novpn --remote
+pnpm exec wrangler d1 execute novpn --remote --file=./scripts/seed.sql
+pnpm exec wrangler secret put API_SECRET           # optional but recommended
+pnpm wrangler:deploy
+```
+
+The Cloudflare Cron Trigger declared in `wrangler.toml` (`0 3 * * *`) calls
+the same `refreshAllProviders` as the Node scheduler. Manual refresh works
+the same via `POST /v1/refresh` once `API_SECRET` is configured.
