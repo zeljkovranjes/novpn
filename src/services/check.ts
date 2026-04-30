@@ -56,11 +56,14 @@ export async function checkIp(ipStr: string, extraCategories: string[]): Promise
       .where('r.end_ip', '>=', ip)
       .execute();
     for (const row of rows) {
-      if (!wanted.has(row.category)) continue;
-      flags[row.category] = true;
+      // Defensive lowercase: createProvider/patchProvider normalize on write,
+      // but a hand-edited DB row with mixed case shouldn't silently drop.
+      const cat = row.category.toLowerCase();
+      if (!wanted.has(cat)) continue;
+      flags[cat] = true;
       hits.push({
         provider_id: row.provider_id,
-        category: row.category,
+        category: cat,
         match: row.cidr ?? `${intToIpv4(row.start_ip)}-${intToIpv4(row.end_ip)}`,
       });
     }
@@ -75,11 +78,12 @@ export async function checkIp(ipStr: string, extraCategories: string[]): Promise
       .where('r.end_ip', '>=', ipBuf)
       .execute();
     for (const row of rows) {
-      if (!wanted.has(row.category)) continue;
-      flags[row.category] = true;
+      const cat = row.category.toLowerCase();
+      if (!wanted.has(cat)) continue;
+      flags[cat] = true;
       hits.push({
         provider_id: row.provider_id,
-        category: row.category,
+        category: cat,
         // Normalize via toBuffer because D1 returns ArrayBuffer for BLOB
         // columns; better-sqlite3 returns Buffer. Both must end up as Buffer
         // for bufferToIpv6 to index correctly.
@@ -92,15 +96,17 @@ export async function checkIp(ipStr: string, extraCategories: string[]): Promise
 
   // flags is the list of categories that *matched*, in stable order:
   // always-on first (vpn, abuse, tor), then any opt-in extras the caller asked
-  // about. Empty array means no category hit. The booleans above expose the
-  // always-on results directly; the array is what callers should iterate when
-  // they care about every category that fired (including custom ones).
+  // about. Deduped — defensive against an extras list with repeats. Empty
+  // array means no category hit.
   const matchedFlags: string[] = [];
-  for (const c of ALWAYS_ON_CATEGORIES) {
-    if (flags[c]) matchedFlags.push(c);
-  }
-  for (const c of extraCategories.map((x) => x.toLowerCase())) {
-    if ((ALWAYS_ON_CATEGORIES as readonly string[]).includes(c)) continue;
+  const seen = new Set<string>();
+  const ordered = [
+    ...ALWAYS_ON_CATEGORIES,
+    ...extraCategories.map((x) => x.toLowerCase()),
+  ];
+  for (const c of ordered) {
+    if (seen.has(c)) continue;
+    seen.add(c);
     if (flags[c]) matchedFlags.push(c);
   }
 

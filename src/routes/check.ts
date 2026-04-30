@@ -77,7 +77,9 @@ function getClientIp(c: Context): string | null {
 
 export const checkRoutes = new Hono();
 
-const KNOWN_FLAGS = ['abuse', 'tor', 'proxy', 'datacenter', 'hosting'] as const;
+// Categories that ?all=true expands into. `vpn`, `abuse`, and `tor` are
+// always evaluated by checkIp, so they don't appear here.
+const KNOWN_FLAGS = ['proxy', 'datacenter', 'hosting'] as const;
 const MAX_FLAGS = 16;
 const MAX_FLAG_KEY = 32;
 
@@ -152,7 +154,13 @@ checkRoutes.post('/check/batch', async (c) => {
       results.push({ ip, error: 'invalid IP address' });
       continue;
     }
-    results.push(await checkIp(ip, extras));
+    try {
+      results.push(await checkIp(ip, extras));
+    } catch (err) {
+      // Don't 500 the whole batch on one bad IP / transient DB hiccup —
+      // record the error against that entry and keep going.
+      results.push({ ip, error: (err as Error).message || 'check failed' });
+    }
   }
   return c.json({ results });
 });

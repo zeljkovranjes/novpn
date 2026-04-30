@@ -8,7 +8,7 @@ small HTTP API.
 
 - IPv4 and IPv6 lookups against merged provider ranges.
 - Pluggable providers — add, edit, or remove sources at runtime via the API.
-- Opt-in non-VPN categories (`?abuse=true`, `?tor=true`, …) plus an `?all=true` flag.
+- `vpn`, `abuse`, and `tor` always evaluated as top-level booleans; other categories (`proxy`, `datacenter`, `hosting`, custom) opt-in via `?<name>=true` or `?all=true`.
 - Daily refresh cron with `ETag` / `Last-Modified` conditional fetches.
 - Same codebase runs on Node (better-sqlite3) or Cloudflare Workers (D1), auto-detected at runtime.
 - Optional bearer auth (`API_SECRET`) that always gates admin endpoints and gates lookup endpoints when set.
@@ -50,17 +50,21 @@ pnpm wrangler:deploy
 ## Usage
 
 ```bash
-# Single lookup (IPv4 or IPv6)
+# Single lookup (IPv4 or IPv6) — vpn/abuse/tor are always evaluated
 curl 'http://localhost:3000/v1/check?ip=1.2.3.4'
-curl 'http://localhost:3000/v1/check?ip=2001:db8::1&abuse=true'
+curl 'http://localhost:3000/v1/check?ip=2001:db8::1'
+
+# Opt into extra categories (proxy, datacenter, hosting, custom)
+curl 'http://localhost:3000/v1/check?ip=1.2.3.4&datacenter=true'
+curl 'http://localhost:3000/v1/check?ip=1.2.3.4&all=true'
 
 # Use the request's client IP (only meaningful behind a trusted proxy)
 curl http://localhost:3000/v1/check/me
 
-# Batch
+# Batch — bad IPs return a per-entry error; the rest still succeed
 curl -X POST http://localhost:3000/v1/check/batch \
   -H 'content-type: application/json' \
-  -d '{"ips":["1.2.3.4","2001:db8::1"],"abuse":true}'
+  -d '{"ips":["1.2.3.4","2001:db8::1","not-an-ip"],"datacenter":true}'
 
 # Add a custom provider (admin)
 curl -X POST http://localhost:3000/v1/providers \
@@ -94,7 +98,8 @@ Response:
 `vpn`, `abuse`, and `tor` are always evaluated and returned as top-level
 booleans — they answer different questions and an IP can be one without
 being the others. `flags` lists the categories that actually matched
-(empty array if none).
+(empty array if none); use it when you've opted into custom categories like
+`proxy`, `datacenter`, `hosting`, or anything else you've added.
 
 Endpoints:
 
