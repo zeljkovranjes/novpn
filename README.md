@@ -5,7 +5,6 @@ public sources, normalizes them into a SQLite-flavored database, and answers
 point-in-CIDR queries over a small HTTP API. Optional opt-in for non-VPN
 categories like AbuseIPDB.
 
-
 Runs on **two backends from one codebase**, auto-detected via
 `navigator.userAgent === 'Cloudflare-Workers'`:
 
@@ -14,7 +13,6 @@ Runs on **two backends from one codebase**, auto-detected via
 
 Routes, services, the URL guard, the dynamic-provider model — all of it is shared.
 Only DB initialization and the cron mechanism (node-cron vs CF Cron Triggers) differ.
-
 
 ## Node quickstart
 
@@ -32,7 +30,6 @@ On first boot, the Node entry:
 4. Schedules a daily refresh at 03:00 (configurable via `REFRESH_CRON`).
 
 Refreshing all six default sources takes ~5 seconds on a warm network.
-
 
 ## Cloudflare Workers quickstart
 
@@ -59,6 +56,7 @@ pnpm wrangler:deploy
 The Cloudflare Cron Trigger declared in `wrangler.toml` (`0 3 * * *`) calls
 the same `refreshAllProviders` as the Node scheduler. Manual refresh works
 the same via `POST /v1/refresh` once `API_SECRET` is configured.
+
 ## Environment
 
 | Var | Default | Purpose |
