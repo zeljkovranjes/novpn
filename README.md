@@ -72,3 +72,18 @@ the same via `POST /v1/refresh` once `API_SECRET` is configured.
 | `FETCH_TIMEOUT_MS` | `30000` | Per-source HTTP timeout |
 | `BATCH_CHECK_MAX` | `1000` | Max IPs in `POST /v1/check/batch` |
 
+## Auth
+
+There are two tiers, controlled by the `API_SECRET` env var:
+
+| Endpoint group | `API_SECRET` unset | `API_SECRET` set |
+|---|---|---|
+| `/`, `/health` | open | open |
+| `/v1/check*`, `/v1/categories`, `/v1/stats` | open | required |
+| `/v1/providers*`, `/v1/refresh` | **503** (admin disabled) | required |
+
+Admin endpoints (provider CRUD, manual refresh) always require an `API_SECRET`.
+If the env var is unset, those endpoints return `503 admin_disabled` — the operator
+can still manage providers via `pnpm refresh` from the host. Lookup endpoints are
+public until you set a secret, then they require `Authorization: Bearer <secret>`.
+
