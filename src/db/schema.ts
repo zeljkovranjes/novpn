@@ -6,7 +6,8 @@ export type SourceFormat =
   | 'json-array'
   | 'mullvad-relays'
   | 'airvpn-status'
-  | 'ivpn-servers';
+  | 'ivpn-servers'
+  | 'tor-csv';
 
 export type SourceConfig = {
   url: string;

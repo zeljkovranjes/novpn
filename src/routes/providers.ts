@@ -19,7 +19,14 @@ const SourceSchema = z.object({
     .url()
     .max(2048)
     .refine((u) => /^https?:\/\//i.test(u), { message: 'url must be http or https' }),
-  format: z.enum(['txt', 'json-array', 'mullvad-relays', 'airvpn-status', 'ivpn-servers']),
+  format: z.enum([
+    'txt',
+    'json-array',
+    'mullvad-relays',
+    'airvpn-status',
+    'ivpn-servers',
+    'tor-csv',
+  ]),
 });
 
 const CreateBody = z.object({

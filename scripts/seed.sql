@@ -55,7 +55,7 @@ VALUES (
 INSERT OR IGNORE INTO providers (id, name, category, enabled, sources, created_at, updated_at)
 VALUES (
   'tor', 'Tor exit nodes', 'tor', 1,
-  '[{"url":"https://www.dan.me.uk/torlist/?exit","format":"txt"}]',
+  '[{"url":"https://www.dan.me.uk/torlist/?exit","format":"txt"},{"url":"https://raw.githubusercontent.com/mmpx12/proxy-list/master/tor-exit-nodes.txt","format":"txt"},{"url":"https://raw.githubusercontent.com/ling0x/tor-nodes/main/exits.csv","format":"tor-csv"}]',
   unixepoch(), unixepoch()
 );
 

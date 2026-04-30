@@ -107,6 +107,9 @@ export async function fetchSource(source: SourceConfig): Promise<FetchOutcome> {
       case 'ivpn-servers':
         ranges = parseIvpnServers(body);
         break;
+      case 'tor-csv':
+        ranges = parseTorCsv(body);
+        break;
       default:
         ranges = parseTxt(body);
     }
@@ -230,6 +233,25 @@ function parseAirvpnStatus(body: string): ParsedRange[] {
       const r = parseLine(v);
       if (r) out.push(r);
     }
+  }
+  return out;
+}
+
+// ling0x/tor-nodes/exits.csv: fingerprint,ipaddr,port — header row first.
+// `ipaddr` carries v4 (e.g. 204.137.14.106) or unbracketed v6
+// (e.g. 2a12:a800:2:1:45:138:16:234). We extract column 2 as the IP.
+function parseTorCsv(body: string): ParsedRange[] {
+  const out: ParsedRange[] = [];
+  const lines = body.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]!.trim();
+    if (!line) continue;
+    if (i === 0 && /fingerprint/i.test(line)) continue;
+    const parts = line.split(',');
+    if (parts.length < 2) continue;
+    const ip = parts[1]!.trim();
+    const r = parseLine(ip);
+    if (r) out.push(r);
   }
   return out;
 }

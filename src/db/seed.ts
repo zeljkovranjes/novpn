@@ -76,9 +76,14 @@ const DEFAULT_PROVIDERS: Seed[] = [
     name: 'Tor exit nodes',
     category: 'tor',
     sources: [
-      // dan.me.uk publishes a flat newline-delimited exit list. Rate-limited
-      // to once per 30 minutes per source IP — fine for daily cron.
+      // dan.me.uk — flat newline-delimited exit list. Rate-limited to once
+      // per 30 minutes per source IP, fine for daily cron.
       { url: 'https://www.dan.me.uk/torlist/?exit', format: 'txt' },
+      // mmpx12/proxy-list — daily-updated v4 + v6 exits, no rate limit.
+      { url: 'https://raw.githubusercontent.com/mmpx12/proxy-list/master/tor-exit-nodes.txt', format: 'txt' },
+      // ling0x/tor-nodes — CSV from the official Tor metrics consensus,
+      // largest single source (~5k exits, mixed v4 + v6).
+      { url: 'https://raw.githubusercontent.com/ling0x/tor-nodes/main/exits.csv', format: 'tor-csv' },
     ],
   },
   {
