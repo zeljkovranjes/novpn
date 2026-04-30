@@ -7,6 +7,7 @@ import {
   ipv6ToBuffer,
   toBuffer,
 } from '../lib/ip.js';
+import { enrichExternal } from './ipinfo.js';
 
 export type ProviderHit = {
   provider_id: string;
@@ -92,6 +93,29 @@ export async function checkIp(ipStr: string, extraCategories: string[]): Promise
           `${bufferToIpv6(toBuffer(row.start_ip))}-${bufferToIpv6(toBuffer(row.end_ip))}`,
       });
     }
+  }
+
+  // External fallback: only if our local DB found zero hits across every
+  // category the caller asked about (always-on + opt-in extras). One pass
+  // through external providers (ip.nc.gy → ipapi.is). Sub-3s timeout per
+  // provider, fail-soft — if both fail, the local result stands.
+  const anyLocalHit = hits.length > 0;
+  if (!anyLocalHit) {
+    const ext = await enrichExternal(ipStr);
+    const apply = (cat: string, value: boolean | undefined) => {
+      if (value !== true) return;
+      if (!wanted.has(cat)) return;
+      flags[cat] = true;
+      hits.push({
+        provider_id: `external:${ext.source ?? 'unknown'}`,
+        category: cat,
+        match: 'external',
+      });
+    };
+    apply('vpn', ext.vpn);
+    apply('abuse', ext.abuse);
+    apply('tor', ext.tor);
+    apply('proxy', ext.proxy);
   }
 
   // flags is the list of categories that *matched*, in stable order:
