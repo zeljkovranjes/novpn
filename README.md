@@ -59,3 +59,16 @@ pnpm wrangler:deploy
 The Cloudflare Cron Trigger declared in `wrangler.toml` (`0 3 * * *`) calls
 the same `refreshAllProviders` as the Node scheduler. Manual refresh works
 the same via `POST /v1/refresh` once `API_SECRET` is configured.
+## Environment
+
+| Var | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | HTTP port |
+| `DATABASE_PATH` | `data/novpn.sqlite` | SQLite file |
+| `API_SECRET` | unset | Auth secret. See **Auth** below — admin endpoints always require it; lookup endpoints require it only when set. |
+| `REFRESH_CRON` | `0 3 * * *` | 5-field cron in server timezone |
+| `DISABLE_CRON` | `0` | Set `1` to disable the in-process scheduler (manual refresh still works) |
+| `DISABLE_REFRESH_ON_START` | `0` | Set `1` to skip the boot-time refresh of never-fetched providers |
+| `FETCH_TIMEOUT_MS` | `30000` | Per-source HTTP timeout |
+| `BATCH_CHECK_MAX` | `1000` | Max IPs in `POST /v1/check/batch` |
+
