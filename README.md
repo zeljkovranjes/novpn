@@ -9,6 +9,7 @@ small HTTP API.
 - IPv4 and IPv6 lookups against merged provider ranges.
 - Pluggable providers — add, edit, or remove sources at runtime via the API.
 - `vpn`, `abuse`, and `tor` always evaluated as top-level booleans; other categories (`proxy`, `datacenter`, `hosting`, custom) opt-in via `?<name>=true` or `?all=true`.
+- External-API fallback (`ip.nc.gy` then `api.ipapi.is`) when local lookup misses, with a 5-minute per-IP cache and a 3 s timeout per provider.
 - Daily refresh cron with `ETag` / `Last-Modified` conditional fetches.
 - Same codebase runs on Node (better-sqlite3) or Cloudflare Workers (D1), auto-detected at runtime.
 - Optional bearer auth (`API_SECRET`) that always gates admin endpoints and gates lookup endpoints when set.
@@ -146,6 +147,47 @@ On Workers, the cron is in `wrangler.toml` under `[triggers] crons`, not in env.
 `x-azure-clientip`, `x-azure-socketip`, `x-appengine-user-ip`, `x-real-ip`,
 `x-client-ip`, `x-cluster-client-ip`, RFC 7239 `Forwarded`, then `x-forwarded-for`.
 Only meaningful behind a reverse proxy that strips/overwrites those headers.
+
+## External fallback
+
+If the local DB has no hit for an IP, lookups fall back to public IP-intelligence
+APIs in this order:
+
+1. `https://ip.nc.gy/json?ip=<ip>` — returns `is_vpn`, `is_tor`, `is_proxy`.
+2. `https://api.ipapi.is/?ip=<ip>` — returns `is_vpn`, `is_tor`, `is_proxy`, `is_abuser`.
+
+If the first call fails (network error, non-2xx, timeout, or invalid JSON) the
+second is tried. If both fail, the local result stands and nothing extra is
+recorded. Successful responses are cached in-memory per IP for 5 minutes
+(capped at 5,000 entries per worker isolate / Node process). Each upstream call
+has a 3-second timeout.
+
+External hits show up in the response as synthetic providers tagged with the
+source:
+
+```json
+{
+  "ip": "185.220.101.1",
+  "vpn": false,
+  "abuse": true,
+  "tor": true,
+  "flags": ["abuse", "tor"],
+  "providers": [
+    { "provider_id": "external:ip.nc.gy", "category": "tor",   "match": "external" },
+    { "provider_id": "external:ipapi.is", "category": "abuse", "match": "external" }
+  ]
+}
+```
+
+The same opt-in rules apply: `vpn`/`abuse`/`tor` are always considered; other
+external categories like `proxy` only apply when the request opted in via
+`?proxy=true` (or batch body `"proxy": true`). If the local DB does have a
+hit, the external call is skipped entirely — no enrichment, no API budget
+spent.
+
+There's no kill switch: if you don't want external lookups, point at a
+forked branch or remove the `enrichExternal(...)` call in
+`src/services/check.ts`.
 
 ## Requirements
 
