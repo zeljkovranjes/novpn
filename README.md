@@ -204,3 +204,17 @@ Seeded once on first migration. Edit or disable via the API; nothing here is spe
 Pomerium/vpnlist is not included by default — its YAML format is unsupported in v1
 and X4BNet covers similar ground.
 
+## Refresh behavior
+
+- **Schedule:** `REFRESH_CRON` (default daily at 03:00) with a random 0–60s jitter.
+- **Conditional fetch:** every source remembers its `ETag` and `Last-Modified`; the
+  next refresh sends `If-None-Match` / `If-Modified-Since` and skips parsing on `304`.
+- **Tolerant:** a failed source marks itself `failed` but doesn't blow up the
+  provider. A provider with at least one OK source ends up `partial`; everything
+  failing yields `failed`.
+- **Atomic per-provider:** new ranges replace the provider's old ranges in a single
+  transaction, so reads never see a half-built index.
+- **Merging:** adjacent and overlapping ranges from a single provider are merged
+  before write — typical input shrinks ~10–15%.
+- **Manual:** `pnpm refresh` (all) or `pnpm refresh <provider-id>` (one) for ops use.
+
