@@ -1,7 +1,6 @@
-import type { Kysely, Transaction } from 'kysely';
 import { getDb, now } from '../db/db.js';
+import { getD1 } from '../db/d1.js';
 import type {
-  Database as DB,
   ProviderRow,
   RefreshStatus,
   SourceConfig,
@@ -17,7 +16,16 @@ import {
 import { isWorkers } from '../lib/runtime.js';
 import { fetchSource, sanitizeErr } from './fetcher.js';
 
-type Executor = Kysely<DB> | Transaction<DB>;
+// D1 caps each prepared statement at ~100 bound parameters and rejects any
+// ALL-AT-ONCE multi-row INSERT past that limit. With 4 columns per row, 24
+// rows × 4 = 96 params keeps us comfortably under. On Node (better-sqlite3)
+// we can use larger chunks without issue.
+const D1_ROW_CHUNK = 24;
+const NODE_ROW_CHUNK = 500;
+// D1 batch() collapses N statements into one round-trip and runs them
+// atomically. Cap per call so an x4bnet-sized refresh (~600k ranges = ~25k
+// INSERT statements) splits across a small number of round-trips.
+const D1_STMT_BATCH = 500;
 
 export type PublicProvider = Omit<ProviderRow, 'sources' | 'enabled'> & {
   enabled: boolean;
@@ -273,49 +281,85 @@ async function refreshProviderInner(id: string): Promise<RefreshResult> {
     const mergedV4 = mergeV4(v4Ranges);
     const mergedV6 = mergeV6(v6Ranges);
 
-    const writeRefresh = async (exec: Executor): Promise<void> => {
-      await exec.deleteFrom('ip_ranges').where('provider_id', '=', id).execute();
-      await exec.deleteFrom('ip_ranges_v6').where('provider_id', '=', id).execute();
-      const CHUNK = 500;
-      for (let i = 0; i < mergedV4.length; i += CHUNK) {
-        const slice = mergedV4.slice(i, i + CHUNK).map((r) => ({
-          provider_id: id,
-          start_ip: r.start,
-          end_ip: r.end,
-          cidr: r.cidr,
-        }));
-        await exec.insertInto('ip_ranges').values(slice).execute();
-      }
-      for (let i = 0; i < mergedV6.length; i += CHUNK) {
-        const slice = mergedV6.slice(i, i + CHUNK).map((r) => ({
-          provider_id: id,
-          start_ip: r.start,
-          end_ip: r.end,
-          cidr: r.cidr,
-        }));
-        await exec.insertInto('ip_ranges_v6').values(slice).execute();
-      }
-      await exec
-        .updateTable('providers')
-        .set({
-          sources: JSON.stringify(updatedSources),
-          last_refresh_at: finishedAt,
-          last_refresh_status: status,
-          updated_at: finishedAt,
-        })
-        .where('id', '=', id)
-        .execute();
-    };
-
     if (isWorkers()) {
-      // kysely-d1 throws "Transactions are not supported yet." — D1 only
-      // exposes atomic writes via its batch() API, which Kysely doesn't map
-      // to db.transaction(). Sequential writes have a brief window of
-      // partial visibility per provider during refresh; acceptable for a
-      // daily-refresh, read-mostly workload.
-      await writeRefresh(db);
+      // D1 path: use the raw batch() API. kysely-d1 doesn't implement
+      // db.transaction() (throws "Transactions are not supported yet"), and
+      // D1 caps each prepared statement at ~100 bound params, so we hand-roll
+      // multi-row INSERTs at 24 rows / 96 params each and batch them in
+      // groups of 500 statements per round-trip.
+      const d1 = getD1();
+      const stmts: D1PreparedStatement[] = [];
+      const flush = async () => {
+        if (stmts.length === 0) return;
+        await d1.batch(stmts.splice(0));
+      };
+
+      stmts.push(
+        d1.prepare('DELETE FROM ip_ranges WHERE provider_id = ?').bind(id),
+        d1.prepare('DELETE FROM ip_ranges_v6 WHERE provider_id = ?').bind(id),
+      );
+
+      for (let i = 0; i < mergedV4.length; i += D1_ROW_CHUNK) {
+        const slice = mergedV4.slice(i, i + D1_ROW_CHUNK);
+        const placeholders = slice.map(() => '(?,?,?,?)').join(',');
+        const sql = `INSERT INTO ip_ranges (provider_id,start_ip,end_ip,cidr) VALUES ${placeholders}`;
+        const params: unknown[] = [];
+        for (const r of slice) params.push(id, r.start, r.end, r.cidr);
+        stmts.push(d1.prepare(sql).bind(...params));
+        if (stmts.length >= D1_STMT_BATCH) await flush();
+      }
+      for (let i = 0; i < mergedV6.length; i += D1_ROW_CHUNK) {
+        const slice = mergedV6.slice(i, i + D1_ROW_CHUNK);
+        const placeholders = slice.map(() => '(?,?,?,?)').join(',');
+        const sql = `INSERT INTO ip_ranges_v6 (provider_id,start_ip,end_ip,cidr) VALUES ${placeholders}`;
+        const params: unknown[] = [];
+        for (const r of slice) params.push(id, r.start, r.end, r.cidr);
+        stmts.push(d1.prepare(sql).bind(...params));
+        if (stmts.length >= D1_STMT_BATCH) await flush();
+      }
+
+      stmts.push(
+        d1
+          .prepare(
+            'UPDATE providers SET sources=?,last_refresh_at=?,last_refresh_status=?,updated_at=? WHERE id=?',
+          )
+          .bind(JSON.stringify(updatedSources), finishedAt, status, finishedAt, id),
+      );
+      await flush();
     } else {
-      await db.transaction().execute(writeRefresh);
+      // Node path: real transaction via better-sqlite3.
+      await db.transaction().execute(async (trx) => {
+        await trx.deleteFrom('ip_ranges').where('provider_id', '=', id).execute();
+        await trx.deleteFrom('ip_ranges_v6').where('provider_id', '=', id).execute();
+        for (let i = 0; i < mergedV4.length; i += NODE_ROW_CHUNK) {
+          const slice = mergedV4.slice(i, i + NODE_ROW_CHUNK).map((r) => ({
+            provider_id: id,
+            start_ip: r.start,
+            end_ip: r.end,
+            cidr: r.cidr,
+          }));
+          await trx.insertInto('ip_ranges').values(slice).execute();
+        }
+        for (let i = 0; i < mergedV6.length; i += NODE_ROW_CHUNK) {
+          const slice = mergedV6.slice(i, i + NODE_ROW_CHUNK).map((r) => ({
+            provider_id: id,
+            start_ip: r.start,
+            end_ip: r.end,
+            cidr: r.cidr,
+          }));
+          await trx.insertInto('ip_ranges_v6').values(slice).execute();
+        }
+        await trx
+          .updateTable('providers')
+          .set({
+            sources: JSON.stringify(updatedSources),
+            last_refresh_at: finishedAt,
+            last_refresh_status: status,
+            updated_at: finishedAt,
+          })
+          .where('id', '=', id)
+          .execute();
+      });
     }
     totalRanges = mergedV4.length + mergedV6.length;
   } else {
