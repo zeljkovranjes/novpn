@@ -253,3 +253,15 @@ novpn/
 └── ...
 ```
 
+## Scripts
+
+```
+pnpm dev          # tsx watch
+pnpm build        # tsc -> dist/
+pnpm start        # node dist/index.js
+pnpm typecheck    # tsc --noEmit
+pnpm migrate      # run migrations up
+pnpm migrate:down # one step down
+pnpm refresh [id] # refresh all providers, or just one
+```
+
