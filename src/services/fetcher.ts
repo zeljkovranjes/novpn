@@ -12,7 +12,11 @@ const MAX_BODY_BYTES = 50 * 1024 * 1024; // 50 MB
 const MAX_REDIRECTS = 5;
 
 export async function fetchSource(source: SourceConfig): Promise<FetchOutcome> {
-  const isJsonFormat = source.format === 'json-array' || source.format === 'mullvad-relays';
+  const isJsonFormat =
+    source.format === 'json-array' ||
+    source.format === 'mullvad-relays' ||
+    source.format === 'airvpn-status' ||
+    source.format === 'ivpn-servers';
   const headers: Record<string, string> = {
     'User-Agent': 'novpn/0.1 (+https://github.com/zeljkovranjes/novpn)',
     Accept: isJsonFormat ? 'application/json' : 'text/plain, */*;q=0.1',
@@ -90,9 +94,22 @@ export async function fetchSource(source: SourceConfig): Promise<FetchOutcome> {
 
   let ranges: ParsedRange[];
   try {
-    if (source.format === 'json-array') ranges = parseJsonArray(body);
-    else if (source.format === 'mullvad-relays') ranges = parseMullvadRelays(body);
-    else ranges = parseTxt(body);
+    switch (source.format) {
+      case 'json-array':
+        ranges = parseJsonArray(body);
+        break;
+      case 'mullvad-relays':
+        ranges = parseMullvadRelays(body);
+        break;
+      case 'airvpn-status':
+        ranges = parseAirvpnStatus(body);
+        break;
+      case 'ivpn-servers':
+        ranges = parseIvpnServers(body);
+        break;
+      default:
+        ranges = parseTxt(body);
+    }
   } catch (err) {
     return { status: 'failed', error: sanitizeErr(err) };
   }
@@ -190,6 +207,60 @@ function parseMullvadRelays(body: string): ParsedRange[] {
   for (const r of data.bridge?.relays ?? []) {
     push(r.ipv4_addr_in);
     push(r.ipv6_addr_in);
+  }
+  return out;
+}
+
+// AirVPN's https://airvpn.org/api/status/?format=json returns:
+//   { servers: [{ ip_v4_in1..ip_v4_in4, ip_v6_in1..ip_v6_in2, ... }, ...] }
+// Each server exposes up to four v4 entry IPs and two v6 entry IPs as
+// separate flat string fields. We pick up any non-empty field matching the
+// pattern.
+function parseAirvpnStatus(body: string): ParsedRange[] {
+  const data = JSON.parse(body) as {
+    servers?: Array<Record<string, unknown>>;
+  };
+  const out: ParsedRange[] = [];
+  const ipKey = /^ip_v[46]_in\d+$/;
+  for (const s of data.servers ?? []) {
+    for (const k of Object.keys(s)) {
+      if (!ipKey.test(k)) continue;
+      const v = s[k];
+      if (typeof v !== 'string' || !v) continue;
+      const r = parseLine(v);
+      if (r) out.push(r);
+    }
+  }
+  return out;
+}
+
+// IVPN's https://api.ivpn.net/v5/servers.json returns:
+//   { wireguard: [{ hosts: [{ host, v2ray, ... }, ...] }, ...],
+//     openvpn:   [{ hosts: [{ host, ... }, ...] }, ...] }
+// We extract `host` (the public entry IP) and `v2ray` (alternate entry, when
+// present). The `ipv6.local_ip` field is a ULA (fd00::/8) used INSIDE the
+// tunnel — not a public exit, so we deliberately ignore it.
+function parseIvpnServers(body: string): ParsedRange[] {
+  const data = JSON.parse(body) as {
+    wireguard?: Array<{ hosts?: Array<{ host?: string; v2ray?: string }> }>;
+    openvpn?: Array<{ hosts?: Array<{ host?: string }> }>;
+  };
+  const out: ParsedRange[] = [];
+  const push = (host: string | undefined) => {
+    if (!host) return;
+    const r = parseLine(host);
+    if (r) out.push(r);
+  };
+  for (const s of data.wireguard ?? []) {
+    for (const h of s.hosts ?? []) {
+      push(h.host);
+      push(h.v2ray);
+    }
+  }
+  for (const s of data.openvpn ?? []) {
+    for (const h of s.hosts ?? []) {
+      push(h.host);
+    }
   }
   return out;
 }

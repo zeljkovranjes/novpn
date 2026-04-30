@@ -58,3 +58,24 @@ VALUES (
   '[{"url":"https://www.dan.me.uk/torlist/?exit","format":"txt"}]',
   unixepoch(), unixepoch()
 );
+
+INSERT OR IGNORE INTO providers (id, name, category, enabled, sources, created_at, updated_at)
+VALUES (
+  'windscribe', 'Windscribe', 'vpn', 1,
+  '[{"url":"https://raw.githubusercontent.com/tn3w/Windscribe-IPs/master/windscribe_ips.txt","format":"txt"}]',
+  unixepoch(), unixepoch()
+);
+
+INSERT OR IGNORE INTO providers (id, name, category, enabled, sources, created_at, updated_at)
+VALUES (
+  'airvpn', 'AirVPN', 'vpn', 1,
+  '[{"url":"https://airvpn.org/api/status/?format=json","format":"airvpn-status"}]',
+  unixepoch(), unixepoch()
+);
+
+INSERT OR IGNORE INTO providers (id, name, category, enabled, sources, created_at, updated_at)
+VALUES (
+  'ivpn', 'IVPN', 'vpn', 1,
+  '[{"url":"https://api.ivpn.net/v5/servers.json","format":"ivpn-servers"}]',
+  unixepoch(), unixepoch()
+);

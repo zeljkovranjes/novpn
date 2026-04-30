@@ -1,7 +1,12 @@
 import type { ColumnType, Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 export type RefreshStatus = 'ok' | 'partial' | 'failed';
-export type SourceFormat = 'txt' | 'json-array' | 'mullvad-relays';
+export type SourceFormat =
+  | 'txt'
+  | 'json-array'
+  | 'mullvad-relays'
+  | 'airvpn-status'
+  | 'ivpn-servers';
 
 export type SourceConfig = {
   url: string;

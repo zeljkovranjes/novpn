@@ -81,6 +81,34 @@ const DEFAULT_PROVIDERS: Seed[] = [
       { url: 'https://www.dan.me.uk/torlist/?exit', format: 'txt' },
     ],
   },
+  {
+    id: 'windscribe',
+    name: 'Windscribe',
+    category: 'vpn',
+    sources: [
+      { url: 'https://raw.githubusercontent.com/tn3w/Windscribe-IPs/master/windscribe_ips.txt', format: 'txt' },
+    ],
+  },
+  {
+    id: 'airvpn',
+    name: 'AirVPN',
+    category: 'vpn',
+    sources: [
+      // Live status endpoint, includes both v4 (ip_v4_in1..4) and v6
+      // (ip_v6_in1..2) entry addresses per server.
+      { url: 'https://airvpn.org/api/status/?format=json', format: 'airvpn-status' },
+    ],
+  },
+  {
+    id: 'ivpn',
+    name: 'IVPN',
+    category: 'vpn',
+    sources: [
+      // wireguard[].hosts[].host + .v2ray + openvpn[].hosts[].host. v4 only —
+      // their published v6 is internal ULA, not exit space.
+      { url: 'https://api.ivpn.net/v5/servers.json', format: 'ivpn-servers' },
+    ],
+  },
 ];
 
 export async function seedIfEmpty(): Promise<{ inserted: string[] }> {
