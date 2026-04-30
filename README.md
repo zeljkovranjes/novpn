@@ -1,8 +1,8 @@
 # novpn
 
-Self-hosted "is this IP a VPN?" lookup service. Pulls VPN exit-IP lists from
-public sources, normalizes them into SQLite or D1, and answers point-in-CIDR
-queries over a small HTTP API.
+Self-hosted VPN detection service. Pulls VPN exit-IP lists from public sources,
+normalizes them into SQLite or D1, and answers point-in-CIDR queries over a
+small HTTP API.
 
 ## Features
 
