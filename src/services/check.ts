@@ -18,16 +18,27 @@ export type CheckResult = {
   ip: string;
   version: 4 | 6;
   vpn: boolean;
+  abuse: boolean;
   flags: Record<string, boolean>;
   providers: ProviderHit[];
 };
+
+// Categories that are always evaluated and surfaced as top-level booleans on
+// the response, regardless of opt-in flags. VPN and abuse answer different
+// questions (is this an exit node vs. has this IP been reported abusive), so
+// callers should be able to read both without remembering to ask.
+const ALWAYS_ON_CATEGORIES = ['vpn', 'abuse'] as const;
 
 export async function checkIp(ipStr: string, extraCategories: string[]): Promise<CheckResult> {
   const version = detectIpVersion(ipStr);
   if (version === null) throw new Error(`invalid IP: ${ipStr}`);
 
-  const wanted = new Set<string>(['vpn', ...extraCategories.map((c) => c.toLowerCase())]);
-  const flags: Record<string, boolean> = { vpn: false };
+  const wanted = new Set<string>([
+    ...ALWAYS_ON_CATEGORIES,
+    ...extraCategories.map((c) => c.toLowerCase()),
+  ]);
+  const flags: Record<string, boolean> = {};
+  for (const c of ALWAYS_ON_CATEGORIES) flags[c] = false;
   for (const c of extraCategories) flags[c.toLowerCase()] = false;
 
   const hits: ProviderHit[] = [];
@@ -82,6 +93,7 @@ export async function checkIp(ipStr: string, extraCategories: string[]): Promise
     ip: ipStr,
     version,
     vpn: flags.vpn === true,
+    abuse: flags.abuse === true,
     flags,
     providers: hits,
   };
